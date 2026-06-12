@@ -6,6 +6,7 @@ from google.genai import types
 from dotenv import load_dotenv
 from uuid import uuid4
 import os
+import sys
 
 # Carrega variáveis de ambiente
 load_dotenv()
@@ -18,32 +19,35 @@ Tente manter as respostas curtas, concisas, objetivas e claras. Se não souber a
 Responda grosserias, ofensas e palavrões de forma amigável e cortês.
 """
 
-# Inicializa o cliente Gemini
+# Inicializa o cliente Gemini com verificação
 api_key = os.getenv("GENAI_KEY") or os.getenv("GOOGLE_API_KEY")
 if not api_key:
-    print("⚠️ ERRO: Nenhuma chave de API encontrada! Configure GENAI_KEY ou GOOGLE_API_KEY")
-    api_key = "CHAVE_NAO_CONFIGURADA"  # Placeholder para não quebrar
-
-client = genai.Client(api_key=api_key)
+    print("ERRO CRÍTICO: Nenhuma chave de API encontrada!", file=sys.stderr)
+    print("Configure as variáveis de ambiente GENAI_KEY ou GOOGLE_API_KEY", file=sys.stderr)
+    # Não falhe aqui para o Gunicorn conseguir carregar o app, mas o chat não funcionará
+    client = None
+else:
+    client = genai.Client(api_key=api_key)
 
 app = Flask(__name__)
 app.secret_key = "ch@tb07"
 
 # Configura CORS corretamente
 CORS(app, resources={r"/*": {"origins": "*"}})
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 active_chats = {}
 
 def get_user_chat():
+    if client is None:
+        return None
+        
     if 'session_id' not in session:
         session['session_id'] = str(uuid4())
-        print(f"Nova sessão: {session['session_id']}")
 
     session_id = session['session_id']
 
     if session_id not in active_chats:
-        print(f"Criando chat para: {session_id}")
         try:
             chat_session = client.chats.create(
                 model=MODELO,
@@ -61,7 +65,7 @@ def root():
     return jsonify({
         "api-websocket": "chatbot",
         "status": "ok",
-        "message": "Servidor funcionando!"
+        "api_key_configured": client is not None
     })
 
 @app.route('/health')
@@ -71,19 +75,19 @@ def health():
 @socketio.on('connect')
 def handle_connect():
     print(f"Cliente conectado: {request.sid}")
-    try:
-        user_chat = get_user_chat()
-        emit('status_conexao', {'data': 'Conectado com sucesso!'})
-    except Exception as e:
-        print(f"Erro no connect: {e}")
-        emit('erro', {'erro': 'Falha ao inicializar'})
+    if client is None:
+        emit('erro', {'erro': 'API key não configurada no servidor'})
+        return
+    emit('status_conexao', {'data': 'Conectado com sucesso!'})
 
 @socketio.on('enviar_mensagem')
 def handle_enviar_mensagem(data):
+    if client is None:
+        emit('erro', {"erro": "API key não configurada"})
+        return
+        
     try:
         mensagem_usuario = data.get("mensagem")
-        print(f"Mensagem recebida: {mensagem_usuario}")
-
         if not mensagem_usuario:
             emit('erro', {"erro": "Mensagem vazia"})
             return
@@ -97,7 +101,6 @@ def handle_enviar_mensagem(data):
         resposta_texto = resposta_gemini.text if hasattr(resposta_gemini, 'text') else resposta_gemini.candidates[0].content.parts[0].text
         
         emit('nova_mensagem', {"remetente": "bot", "texto": resposta_texto})
-        print(f"Resposta enviada")
 
     except Exception as e:
         print(f"Erro: {e}")
@@ -107,9 +110,10 @@ def handle_enviar_mensagem(data):
 def handle_disconnect():
     print(f"Cliente desconectado: {request.sid}")
 
-# ⚠️ IMPORTANTE: Para o Render
+# ⚠️ CONFIGURAÇÃO CRÍTICA PARA O RENDER
+# O Gunicorn precisa de uma variável 'app' ou 'application' no nível global
+# Esta linha é OBRIGATÓRIA
+application = app
+
 if __name__ == "__main__":
     socketio.run(app, host='0.0.0.0', port=5000)
-
-# O Gunicorn precisa disso
-application = app
