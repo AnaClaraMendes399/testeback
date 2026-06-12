@@ -7,10 +7,6 @@ from dotenv import load_dotenv
 from uuid import uuid4
 import os
 import sys
-import eventlet
-
-# Isso resolve o erro do SSL
-eventlet.monkey_patch()
 
 load_dotenv()
 
@@ -33,7 +29,8 @@ app = Flask(__name__)
 app.secret_key = "ch@tb07"
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+# Mudança principal: usar threading em vez de eventlet/gevent
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', ping_timeout=60, ping_interval=25)
 
 active_chats = {}
 
