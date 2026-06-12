@@ -7,6 +7,11 @@ from dotenv import load_dotenv
 from uuid import uuid4
 import os
 import sys
+import ssl
+import eventlet
+
+# Patch do eventlet para resolver problema SSL
+eventlet.monkey_patch()
 
 # Carrega variáveis de ambiente
 load_dotenv()
@@ -23,18 +28,16 @@ Responda grosserias, ofensas e palavrões de forma amigável e cortês.
 api_key = os.getenv("GENAI_KEY") or os.getenv("GOOGLE_API_KEY")
 if not api_key:
     print("ERRO CRÍTICO: Nenhuma chave de API encontrada!", file=sys.stderr)
-    print("Configure as variáveis de ambiente GENAI_KEY ou GOOGLE_API_KEY", file=sys.stderr)
-    # Não falhe aqui para o Gunicorn conseguir carregar o app, mas o chat não funcionará
     client = None
 else:
     client = genai.Client(api_key=api_key)
 
 app = Flask(__name__)
 app.secret_key = "ch@tb07"
-
-# Configura CORS corretamente
 CORS(app, resources={r"/*": {"origins": "*"}})
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+
+# Configuração com eventlet
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 active_chats = {}
 
@@ -110,9 +113,7 @@ def handle_enviar_mensagem(data):
 def handle_disconnect():
     print(f"Cliente desconectado: {request.sid}")
 
-# ⚠️ CONFIGURAÇÃO CRÍTICA PARA O RENDER
-# O Gunicorn precisa de uma variável 'app' ou 'application' no nível global
-# Esta linha é OBRIGATÓRIA
+# Para o Render
 application = app
 
 if __name__ == "__main__":
