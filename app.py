@@ -50,14 +50,14 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 active_chats = {}
 
-def get_user_chat():
+def get_user_chat(session_id=None):
     if client is None:
         return None
         
-    if 'session_id' not in session:
-        session['session_id'] = str(uuid4())
-
-    session_id = session['session_id']
+    if not session_id:
+        if 'session_id' not in session:
+            session['session_id'] = str(uuid4())
+        session_id = session['session_id']
 
     if session_id not in active_chats:
         try:
@@ -86,7 +86,16 @@ def handle_connect():
     if client is None:
         emit('erro', {'erro': 'API key não configurada'})
         return
-    emit('status_conexao', {'data': 'Conectado com sucesso!'})
+        
+    # Recupera ou gera o ID de sessão para enviar ao cliente
+    if 'session_id' not in session:
+        session['session_id'] = str(uuid4())
+    session_id = session['session_id']
+    
+    emit('status_conexao', {
+        'data': 'Conectado com sucesso!',
+        'session_id': session_id
+    })
 
 @socketio.on('enviar_mensagem')
 def handle_enviar_mensagem(data):
@@ -96,11 +105,12 @@ def handle_enviar_mensagem(data):
         
     try:
         mensagem_usuario = data.get("mensagem")
+        session_id = data.get("session_id")
         if not mensagem_usuario:
             emit('erro', {"erro": "Mensagem vazia"})
             return
 
-        user_chat = get_user_chat()
+        user_chat = get_user_chat(session_id)
         if user_chat is None:
             emit('erro', {"erro": "Sessão não inicializada"})
             return
@@ -121,4 +131,5 @@ def handle_disconnect():
 application = app
 
 if __name__ == "__main__":
-    socketio.run(app, host='0.0.0.0', port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, host='0.0.0.0', port=port)
