@@ -7,13 +7,11 @@ from dotenv import load_dotenv
 from uuid import uuid4
 import os
 import sys
-import ssl
 import eventlet
 
-# Patch do eventlet para resolver problema SSL
+# Isso resolve o erro do SSL
 eventlet.monkey_patch()
 
-# Carrega variáveis de ambiente
 load_dotenv()
 
 MODELO = "gemini-2.5-flash"
@@ -24,10 +22,9 @@ Tente manter as respostas curtas, concisas, objetivas e claras. Se não souber a
 Responda grosserias, ofensas e palavrões de forma amigável e cortês.
 """
 
-# Inicializa o cliente Gemini com verificação
 api_key = os.getenv("GENAI_KEY") or os.getenv("GOOGLE_API_KEY")
 if not api_key:
-    print("ERRO CRÍTICO: Nenhuma chave de API encontrada!", file=sys.stderr)
+    print("ERRO: Nenhuma chave de API encontrada!")
     client = None
 else:
     client = genai.Client(api_key=api_key)
@@ -36,8 +33,7 @@ app = Flask(__name__)
 app.secret_key = "ch@tb07"
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Configuração com eventlet
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 active_chats = {}
 
@@ -79,7 +75,7 @@ def health():
 def handle_connect():
     print(f"Cliente conectado: {request.sid}")
     if client is None:
-        emit('erro', {'erro': 'API key não configurada no servidor'})
+        emit('erro', {'erro': 'API key não configurada'})
         return
     emit('status_conexao', {'data': 'Conectado com sucesso!'})
 
@@ -113,7 +109,6 @@ def handle_enviar_mensagem(data):
 def handle_disconnect():
     print(f"Cliente desconectado: {request.sid}")
 
-# Para o Render
 application = app
 
 if __name__ == "__main__":
