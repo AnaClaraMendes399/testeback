@@ -29,8 +29,7 @@ app = Flask(__name__)
 app.secret_key = "ch@tb07"
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Mudança principal: usar threading em vez de eventlet/gevent
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', ping_timeout=60, ping_interval=25)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 active_chats = {}
 
@@ -63,10 +62,6 @@ def root():
         "status": "ok",
         "api_key_configured": client is not None
     })
-
-@app.route('/health')
-def health():
-    return jsonify({"status": "healthy"})
 
 @socketio.on('connect')
 def handle_connect():
