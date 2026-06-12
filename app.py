@@ -95,7 +95,6 @@ def root():
         "status": "ok"
     })
 
-
 # ------------------------------------------------------------------
 # EVENTOS SOCKET.IO (Onde a mágica do tempo real acontece)
 # ------------------------------------------------------------------
@@ -118,7 +117,6 @@ def handle_connect():
     except Exception as e:
         app.logger.error(f"Erro durante o evento connect para {request.sid}: {e}", exc_info=True)
         emit('erro', {'erro': 'Falha ao inicializar a sessão de chat no servidor.'})
-
 
 @socketio.on('enviar_mensagem')
 def handle_enviar_mensagem(data):
@@ -165,7 +163,6 @@ def handle_enviar_mensagem(data):
         # Se algo quebrar (ex: falha de internet), avisamos o front-end educadamente.
         emit('erro', {"erro": f"Ocorreu um erro no servidor: {str(e)}"})
 
-
 @socketio.on('disconnect')
 def handle_disconnect():
     """
@@ -173,7 +170,12 @@ def handle_disconnect():
     """
     print(f"Cliente desconectado: {request.sid}, session_id: {session.get('session_id', 'N/A')}")
 
-
-# Inicia o servidor local. A porta padrão do Flask costuma ser a 5000.
+# ⚠️ IMPORTANTE: Esta parte é CRUCIAL para o Render funcionar
 if __name__ == "__main__":
-    socketio.run(app)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+
+# 🔥 EXPOSIÇÃO EXPLÍCITA PARA O GUNICORN NO RENDER
+# O Render precisa que estas variáveis estejam disponíveis no nível global
+# Mantenha estas linhas EXATAMENTE assim no final do arquivo
+application = app
+socketio_app = socketio
