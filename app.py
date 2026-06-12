@@ -174,8 +174,6 @@ def handle_disconnect():
 if __name__ == "__main__":
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)
 
-# 🔥 EXPOSIÇÃO EXPLÍCITA PARA O GUNICORN NO RENDER
-# O Render precisa que estas variáveis estejam disponíveis no nível global
-# Mantenha estas linhas EXATAMENTE assim no final do arquivo
+# ⚠️ IMPORTANTE: Essas duas linhas são OBRIGATÓRIAS para o Render
 application = app
 socketio_app = socketio
